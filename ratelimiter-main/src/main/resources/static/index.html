@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis Rate Limiter Dashboard</title>
+    <meta name="description" content="A premium real-time visualization dashboard to monitor and test Spring Boot rate limiting with Redis.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --accent: #a855f7;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --error: #ef4444;
+            --error-glow: rgba(239, 68, 68, 0.2);
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+        }
+
+        header {
+            padding: 2rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            background-color: rgba(11, 15, 25, 0.5);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .logo-title h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, #d1d5db);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-title p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            background-color: var(--success-glow);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        main {
+            flex: 1;
+            padding: 3rem 4rem;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+            header {
+                padding: 1.5rem 2rem;
+            }
+            main {
+                padding: 2rem;
+            }
+        }
+
+        .glass-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 2.25rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.25);
+            box-shadow: 0 15px 35px rgba(99, 102, 241, 0.05);
+        }
+
+        .card-header {
+            margin-bottom: 2rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .interactive-zone {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .big-trigger-btn {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            border: none;
+            padding: 1.25rem 2rem;
+            border-radius: 16px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px var(--primary-glow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .big-trigger-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.6);
+        }
+
+        .big-trigger-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Bucket / Gauge representation */
+        .gauge-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .gauge-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .gauge-bar-outer {
+            width: 100%;
+            height: 18px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 9px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }
+
+        .gauge-bar-inner {
+            height: 100%;
+            width: 0%;
+            border-radius: 9px;
+            background: linear-gradient(to right, var(--success), var(--primary));
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+        }
+
+        .gauge-bar-inner.warning {
+            background: linear-gradient(to right, var(--success), var(--warning));
+        }
+
+        .gauge-bar-inner.danger {
+            background: var(--error);
+            box-shadow: 0 0 10px var(--error);
+        }
+
+        /* Logs Console */
+        .console-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .clear-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .console-screen {
+            background-color: #05070c;
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            flex: 1;
+            min-height: 380px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            padding: 1.25rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+        }
+
+        .log-entry {
+            display: flex;
+            flex-direction: column;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .log-time {
+            color: #555866;
+        }
+
+        .log-status {
+            font-weight: 500;
+        }
+
+        .log-status.success { color: var(--success); }
+        .log-status.error { color: var(--error); }
+        .log-status.warning { color: var(--warning); }
+
+        .log-details {
+            color: #b5bac2;
+            word-break: break-all;
+            white-space: pre-wrap;
+            font-size: 0.8rem;
+        }
+
+        /* Widgets Section */
+        .widgets-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-family: inherit;
+            color: white;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-submit {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-submit:hover {
+            background-color: #4f46e5;
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .flex-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        footer {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--card-border);
+            margin-top: 3rem;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-section">
+            <div class="logo-badge">R</div>
+            <div class="logo-title">
+                <h1>Redis Rate Limiter</h1>
+                <p>Spring Boot & Redis Integration Dashboard</p>
+            </div>
+        </div>
+        <div class="status-badge" id="service-status">
+            <div class="status-dot"></div>
+            <span>Server Connected</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Side: Trigger & Monitoring -->
+        <div class="interactive-zone">
+            <!-- Rate limit controller -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2>⚡ Rate Limiter Tester</h2>
+                    <p>Trigger requests and inspect rate limiting responses from Redis.</p>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+                    <!-- Massive Request trigger button -->
+                    <button class="big-trigger-btn" id="trigger-request-btn" onclick="sendTestRequest()">
+                        <span>Send API Request</span>
+                    </button>
+
+                    <!-- Progress bar of requests -->
+                    <div class="gauge-container">
+                        <div class="gauge-label">
+                            <span style="color: var(--text-secondary);">Request Count (Current Window)</span>
+                            <span id="gauge-numbers" style="font-weight: 600;">0 / 5</span>
+                        </div>
+                        <div class="gauge-bar-outer">
+                            <div class="gauge-bar-inner" id="gauge-fill"></div>
+                        </div>
+                        <p id="reset-timer-label" style="font-size: 0.8rem; color: var(--text-secondary); text-align: right; margin-top: 4px;">
+                            Window limits reset automatically every 60s
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forms for other operations -->
+            <div class="widgets-container">
+                <!-- Create User -->
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>👤 Create User</h2>
+                        <p>Creates a new user database record. (Counts towards rate limits)</p>
+                    </div>
+                    <form onsubmit="createUser(event)">
+                        <div class="form-group">
+                            <label for="create-name">Name</label>
+                            <input type="text" id="create-name" class="form-input" placeholder="e.g. Alice Smith" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="create-email">Email</label>
+                            <input type="email" id="create-email" class="form-input" placeholder="e.g. alice@gmail.com" required>
+                        </div>
+                        <button type="submit" class="btn-submit" id="btn-create-user">Create User</button>
+                    </form>
+                </div>
+
+                <!-- Fetch User -->
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>🔍 Find User by ID</h2>
+                        <p>Fetches a user profile. (Counts towards rate limits)</p>
+                    </div>
+                    <div class="flex-row">
+                        <div class="form-group">
+                            <label for="search-id">User UUID</label>
+                            <input type="text" id="search-id" class="form-input" placeholder="Enter valid UUID..." value="26245cc0-f566-4420-a692-43f040cf8444">
+                        </div>
+                        <button class="btn-submit" onclick="fetchUserById()" style="height: 45px;">Search</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Live Logs Terminal -->
+        <div class="console-container">
+            <div class="glass-card" style="display: flex; flex-direction: column; height: 100%;">
+                <div class="console-header">
+                    <h2 style="font-size: 1.15rem; font-weight: 600;">🖥️ Live Server Activity Logs</h2>
+                    <button class="clear-btn" onclick="clearLogs()">Clear Console</button>
+                </div>
+                <div class="console-screen" id="console-screen">
+                    <div class="log-entry" style="border: none;">
+                        <span style="color: #6366f1;">[Console Initialized] Dashboard ready to capture API traffic.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Redis Rate Limiter App Dashboard • Designed for visual verification and testing</p>
+    </footer>
+
+    <script>
+        let localRequestCount = 0;
+        const maxLimit = 5;
+        let windowTimer = null;
+        let secondsRemaining = 60;
+
+        function updateGauge(count) {
+            const percentage = Math.min((count / maxLimit) * 100, 100);
+            const fill = document.getElementById('gauge-fill');
+            const numbers = document.getElementById('gauge-numbers');
+            
+            fill.style.width = percentage + '%';
+            numbers.innerText = `${count} / ${maxLimit}`;
+
+            // Reset classes
+            fill.className = 'gauge-bar-inner';
+
+            if (count >= maxLimit) {
+                fill.classList.add('danger');
+            } else if (count >= 4) {
+                fill.classList.add('warning');
+            }
+        }
+
+        function startWindowCountdown() {
+            if (windowTimer) return;
+            
+            const timerLabel = document.getElementById('reset-timer-label');
+            secondsRemaining = 60;
+            
+            windowTimer = setInterval(() => {
+                secondsRemaining--;
+                if (secondsRemaining <= 0) {
+                    clearInterval(windowTimer);
+                    windowTimer = null;
+                    localRequestCount = 0;
+                    updateGauge(0);
+                    timerLabel.innerText = "Window limits reset automatically every 60s";
+                    addLog("SYSTEM", "RESET", "Rate Limit Time Window Expired in Redis. Count Reset to 0.", "info");
+                } else {
+                    timerLabel.innerText = `Redis window resets in ${secondsRemaining}s`;
+                }
+            }, 1000);
+        }
+
+        function addLog(method, url, details, type) {
+            const screen = document.getElementById('console-screen');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const now = new Date().toLocaleTimeString();
+            
+            let statusClass = 'success';
+            if (type === 'error') statusClass = 'error';
+            if (type === 'info') statusClass = 'warning';
+
+            entry.innerHTML = `
+                <div class="log-header">
+                    <span class="log-time">[${now}] ${method} ${url}</span>
+                    <span class="log-status ${statusClass}">${type.toUpperCase()}</span>
+                </div>
+                <div class="log-details">${details}</div>
+            `;
+            
+            screen.appendChild(entry);
+            screen.scrollTop = screen.scrollHeight;
+        }
+
+        function clearLogs() {
+            const screen = document.getElementById('console-screen');
+            screen.innerHTML = `
+                <div class="log-entry" style="border: none;">
+                    <span style="color: #6366f1;">[Console Cleared] Dashboard listening...</span>
+                </div>
+            `;
+        }
+
+        // 1. Send Test Request (triggers rate limit check)
+        async function sendTestRequest() {
+            const randomUUID = "26245cc0-f566-4420-a692-43f040cf8444";
+            const url = `/api/v1/users/${randomUUID}`;
+            
+            // Start local window countdown
+            if (localRequestCount === 0) {
+                startWindowCountdown();
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (response.status === 200 || response.status === 404) {
+                    localRequestCount++;
+                    updateGauge(localRequestCount);
+                    addLog("GET", url, JSON.stringify(data, null, 2), "success");
+                } else if (response.status === 429) {
+                    localRequestCount = 5; // force full gauge
+                    updateGauge(5);
+                    addLog("GET", url, JSON.stringify(data, null, 2), "error");
+                } else {
+                    addLog("GET", url, `Unexpected status ${response.status}: ${JSON.stringify(data)}`, "info");
+                }
+            } catch (err) {
+                addLog("GET", url, `Network Error: ${err.message}`, "error");
+            }
+        }
+
+        // 2. Create User
+        async function createUser(event) {
+            event.preventDefault();
+            const name = document.getElementById('create-name').value;
+            const email = document.getElementById('create-email').value;
+            const url = "/api/v1/users/save";
+
+            if (localRequestCount === 0) {
+                startWindowCountdown();
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.status === 201) {
+                    localRequestCount++;
+                    updateGauge(localRequestCount);
+                    addLog("POST", url, `User Created Successfully!\n${JSON.stringify(data, null, 2)}`, "success");
+                    
+                    // Auto fill the search ID with the newly created user's ID
+                    if (data.response && data.response.id) {
+                        document.getElementById('search-id').value = data.response.id;
+                    }
+                } else if (response.status === 429) {
+                    localRequestCount = 5;
+                    updateGauge(5);
+                    addLog("POST", url, JSON.stringify(data, null, 2), "error");
+                } else {
+                    addLog("POST", url, JSON.stringify(data, null, 2), "error");
+                }
+            } catch (err) {
+                addLog("POST", url, `Network Error: ${err.message}`, "error");
+            }
+        }
+
+        // 3. Find User by ID
+        async function fetchUserById() {
+            const uuid = document.getElementById('search-id').value.trim();
+            if (!uuid) {
+                alert("Please enter a valid UUID");
+                return;
+            }
+            const url = `/api/v1/users/${uuid}`;
+
+            if (localRequestCount === 0) {
+                startWindowCountdown();
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (response.status === 200) {
+                    localRequestCount++;
+                    updateGauge(localRequestCount);
+                    addLog("GET", url, `User Found:\n${JSON.stringify(data, null, 2)}`, "success");
+                } else if (response.status === 429) {
+                    localRequestCount = 5;
+                    updateGauge(5);
+                    addLog("GET", url, JSON.stringify(data, null, 2), "error");
+                } else {
+                    addLog("GET", url, JSON.stringify(data, null, 2), "error");
+                }
+            } catch (err) {
+                addLog("GET", url, `Network Error: ${err.message}`, "error");
+            }
+        }
+    </script>
+</body>
+</html>
